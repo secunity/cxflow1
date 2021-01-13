@@ -1,10 +1,10 @@
 FROM    pmacct/nfacctd
 # FROM    python:3.6
 
-# ADD     entrypoint.sh /
-
 ENV     PATH="/opt/secunity-cxflow:${PATH}"
 ENV     PYTHONPATH=/opt/secunity-cxflow
+
+ADD     entrypoint.sh /
 
 RUN     apt-get update && apt-get upgrade -y && apt-get autoremove -y &&\
         apt-get install -y python3-pip git &&\
@@ -17,15 +17,15 @@ RUN     apt-get update && apt-get upgrade -y && apt-get autoremove -y &&\
         python3 -m pip install -r /opt/secunity-cxflow/requirements.txt &&\
         chmod 777 /opt/secunity-cxflow/worker.py &&\
         chmod 777 /opt/secunity-cxflow/upgrader.py &&\
-        chmod 777 /opt/secunity-cxflow/docker/entrypoint.py
-# chmod 777 /entrypoint.sh &&\
+        chmod 777 /opt/secunity-cxflow/docker/entrypoint.py &&\
+        chmod 777 /entrypoint.sh
 
 ADD     supervisord.conf /etc/supervisor
 
 WORKDIR /opt/secunity-cxflow
 
-ENTRYPOINT /opt/secunity-cxflow/docker/entrypoint.py
-# ENTRYPOINT /entrypoint.sh
+# ENTRYPOINT /opt/secunity-cxflow/docker/entrypoint.py
+ENTRYPOINT /entrypoint.sh
 
 # CMD ["/entrypoint.sh"]
 

@@ -44,7 +44,6 @@ if __name__ == '__main__':
     import logging
 
     logger = logging.getLogger()
-    logger.addHandler(sys.stdout)
 
     logger.debug('checking container switches')
     update_secunity_config(logger=logger)

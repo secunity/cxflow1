@@ -3,7 +3,7 @@
 LOG_INIT = '__log_init__'
 
 
-NAME = 'secunity-cxflow1'
+NAME = 'secunity-cxflow'
 
 
 cnf = {

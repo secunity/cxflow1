@@ -30,6 +30,8 @@ _DEFAULTS = {
 
     'tag': 100,
 
+    'interval': '1h',
+
     'xflow_type': 'netflow',
 
     'nfacctd_config': 'nfacctd.conf',
@@ -257,7 +259,7 @@ def _start_scheduler(**kwargs):
                                      timezone=pytz.utc)
 
     _scheduler.add_job(func=_work,
-                       trigger=IntervalTrigger(minutes=1),
+                       trigger=IntervalTrigger(seconds=args['interval'].total_seconds()),
                        kwargs=kwargs,
                        max_instances=1,
                        next_run_time=datetime.datetime.utcnow() + datetime.timedelta(seconds=1))
@@ -279,6 +281,12 @@ def _parse_config(config, **kwargs):
     with open(config, 'r') as f:
         return json.load(f)
 
+
+_re_interval = {
+    'minute': re.compile(r'^\s*([1-9][0-9]*)\s*m\s*$', re.IGNORECASE),
+    'hours': re.compile(r'^\s*([1-9][0-9]*)\s*h\s*$', re.IGNORECASE),
+    'days': re.compile(r'^\s*([1-9][0-9]*)\s*d\s*$', re.IGNORECASE),
+}
 
 def _validate_args(args):
     identifier = args.get('identifier')
@@ -302,11 +310,28 @@ def _validate_args(args):
         log.error(f'invalid listening port: "{port}"')
         return False
 
+    interval = args.get('interval')
+    if not interval:
+        interval = _DEFAULTS['interval']
+    m = _re_interval['minute'].match(interval)
+    if m:
+        interval = datetime.timedelta(minutes=int(m.groups()[0]))
+    else:
+        m = _re_interval['hours'].match(interval)
+        if m:
+            interval = datetime.timedelta(hours=int(m.groups()[0]))
+        elif _re_interval['days'].match(interval):
+            interval = datetime.timedelta(days=int(m.groups()[0]))
+        else:
+            log.error(f'invalid interval: "{interval}"')
+            return False
+    args['interval'] = interval
+
     return True
 
 
 def _parse_enviroment_vars(args):
-    for key in ('config', 'logfile', 'port', 'identifier', 'type', 'url_scheme', 'url_host', 'url_port'):
+    for key in ('config', 'logfile', 'port', 'identifier', 'interval', 'type', 'url_scheme', 'url_host', 'url_port'):
         if args.get(key) is None:
             env_key = f'SECUNITY_{key.upper()}'
             args[key] = os.environ.get(env_key)
