@@ -9,7 +9,6 @@ RUN         apt-get update && apt-get upgrade -y && apt-get autoremove -y &&\
             mkdir -p /etc/supervisor &&\
             mkdir -p /etc/secunity &&\
             git clone https://github.com/secunity/cxflow1.git /opt/secunity-cxflow &&\
-            cd /opt/secunity-cxflow && git fetch && git checkout cxf_1 && git pull &&\
             python3 -m pip install --upgrade pip setuptools &&\
             python3 -m pip install supervisor &&\
             python3 -m pip install -r /opt/secunity-cxflow/requirements.txt &&\
