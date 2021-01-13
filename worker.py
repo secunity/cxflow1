@@ -10,9 +10,8 @@ import re
 import shlex
 import subprocess
 from ipaddress import IPv4Network, IPv4Address
-
+from conf import SECUNITY_FOLDER, __DEFAULT_CONF__, __NFACCTD_SUPERVISOR_TASK_NAME__
 import requests
-from conf import cnf as _cnf
 from logger import log
 
 
@@ -22,10 +21,6 @@ _URL = {
     'url_path': 'cxflow1/v1.0.0/in/account/{identifier}/{type}/',
     'url_method': 'GET'
 }
-
-SECUNITY_FOLDER = '/etc/secunity'
-PMCACCTD_FOLDER_ = '/etc/pmacct'
-__NFACCTD_SUPERVISOR_TASK_NAME__ = 'nfacctd'
 
 MAX_PORT = 65535
 
@@ -318,23 +313,26 @@ def _parse_enviroment_vars(args):
     return args
 
 if __name__ == '__main__':
-    import argparse
-    import time
-    import copy
+    # import argparse
+    # import time
+    # import copy
+    from conf import get_args_parser
 
-    parser = argparse.ArgumentParser(description='Secunity Network Device XFlow Filter')
-
-    parser.add_argument('-c', '--config', type=str, help='Config file (overriding all other options)', default=None)
-
-    parser.add_argument('-l', '--logfile', type=str, help='File to log to', default=None)
-    parser.add_argument('-v', '--verbose', type=bool, help='Indicates whether to log verbose data', default=False)
-
-    parser.add_argument('--to_stdout', '--stdout', type=str, help='Log messages to stdout', default=False)
-    parser.add_argument('--to_stderr', '--stderr', type=str, help='Log errors to stderr', default=False)
-
-    parser.add_argument('-p', '--port', type=str, help='Listening port (UDP)', default=None)
-    parser.add_argument('--identifier', '--id', type=str, help='Agent ID - must be XFlow Agent ID', default=None)
-    parser.add_argument('-t', '--type', type=str, help='XFlow type (netflow/sflow/ipfix)', default=None)
+    parser = get_args_parser()
+    # argparse.ArgumentParser(description='Secunity Network Device XFlow Filter')
+    #
+    #
+    # parser.add_argument('-c', '--config', type=str, help='Config file (overriding all other options)', default=None)
+    #
+    # parser.add_argument('-l', '--logfile', type=str, help='File to log to', default=None)
+    # parser.add_argument('-v', '--verbose', type=bool, help='Indicates whether to log verbose data', default=False)
+    #
+    # parser.add_argument('--to_stdout', '--stdout', type=str, help='Log messages to stdout', default=False)
+    # parser.add_argument('--to_stderr', '--stderr', type=str, help='Log errors to stderr', default=False)
+    #
+    # parser.add_argument('-p', '--port', type=str, help='Listening port (UDP)', default=None)
+    # parser.add_argument('--identifier', '--id', type=str, help='Agent ID - must be XFlow Agent ID', default=None)
+    # parser.add_argument('-t', '--type', type=str, help='XFlow type (netflow/sflow/ipfix)', default=None)
 
     # parser.add_argument('--url', type=str, help='The URL to use for remove server', default=None)
     # parser.add_argument('--url_scheme', type=str, help='Remote server URL scheme', default=None)
@@ -351,6 +349,10 @@ if __name__ == '__main__':
     args = _args
 
     config = args['config']
+    if not config:
+        default_conf = os.path.join(SECUNITY_FOLDER, __DEFAULT_CONF__)
+        if os.path.isfile(default_conf):
+            config = args['config'] = default_conf
     if config:
         config = _parse_config(config)
         args.update(config)
