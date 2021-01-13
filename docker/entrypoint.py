@@ -19,8 +19,10 @@ _procs = {
 def update_secunity_config(logger=None):
     parser = get_args_parser()
     args = parser.parse_args()
-    args = {_: getattr(args, _) for _ in dir(args)
-            if not _.startswith('_') and getattr(args, _) is not None}
+    args = {
+        _: getattr(args, _) for _ in dir(args)
+        if not _.startswith('_') and getattr(args, _) is not None
+    }
 
     if args:
         file_name = os.path.join(SECUNITY_FOLDER, __DEFAULT_CONF__)

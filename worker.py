@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-'''
+"""
 All rights reserved to Secunity 2021
-'''
+"""
 import collections
 import datetime
 import os
@@ -18,7 +18,7 @@ from logger import log
 _URL = {
     'url_host': 'api.secunity.io',
     'url_scheme': 'https',
-    'url_path': 'cxflow1/v1.0.0/in/account/{identifier}/{type}/',
+    'url_path': 'cxflow1/v1.0.0/in/account/{identifier}/{protocol}/',
     'url_method': 'GET'
 }
 
@@ -26,13 +26,9 @@ MAX_PORT = 65535
 
 
 _DEFAULTS = {
-    # 'config': f'{SECUNITY_FOLDER}/secunity.conf',
-
     'tag': 100,
-
     'interval': '1h',
-
-    'xflow_type': 'netflow',
+    'protocol': 'netflow',
 
     'nfacctd_config': 'nfacctd.conf',
     'networks_config': 'secunity-networks.map',
@@ -65,17 +61,18 @@ def _make_request(**kwargs):
     if not url:
         url_path = kwargs.get('url_path', con_params.get('url_path'))
         if '{' in url_path:
-            kwargs['url_path'] = url_path.format(identifier=identifier, type=kwargs['type'])
-        url_params = {_: kwargs.get(_, con_params.get(_)) for _ in list(set(list(kwargs.keys()) + list(con_params.keys())))
-                      if _ == 'url' or _.startswith('url_')}
+            kwargs['url_path'] = url_path.format(identifier=identifier, protocol=kwargs['protocol'])
+        url_params = {
+            _: kwargs.get(_, con_params.get(_))
+            for _ in list(set(list(kwargs.keys()) + list(con_params.keys())))
+            if _ == 'url' or _.startswith('url_')
+        }
 
         url_port = url_params.get('url_port')
         if url_port:
             url_params['url_host'] = f"{url_params['url_host']}:{url_port}"
         url = '{url_scheme}://{url_host}/{url_path}'.format(**url_params)
         con_params.update(url_params)
-
-        # url = f"{url.rstrip('/ ')}/{identifier}/"
 
     log.debug(f'making request for identifier {identifier} to {url}')
     try:
@@ -210,6 +207,7 @@ def restart_supervisor_tasks():
 
     return True
 
+
 def _work(**kwargs):
     log.debug('starting iteration')
 
@@ -226,9 +224,6 @@ def _work(**kwargs):
     tag, cur_networks = _get_current_networks(**kwargs)
 
     networks_diff = _diff_lists(cur_networks, networks)
-
-    # cur_forwarders = _get_current_forwarders(tag=tag)
-    # collector_diff = collector not in cur_forwarders
 
     if not networks_diff: # and not collector_diff:
         log.debug('no networks changes - quiting')
@@ -327,46 +322,34 @@ def _validate_args(args):
             return False
     args['interval'] = interval
 
+    protocol = args.get('protocol', '').strip()
+    if protocol:
+        if protocol.lower() not in ('netflow', 'sflow', 'ipfix'):
+            log.error(f'invalid protocol: "{protocol}"')
+    else:
+        protocol = _DEFAULTS['protocol']
+    args['protocol'] = protocol.lower()
+
     return True
 
 
 def _parse_enviroment_vars(args):
-    for key in ('config', 'logfile', 'port', 'identifier', 'interval', 'type', 'url_scheme', 'url_host', 'url_port'):
+    for key in ('config', 'logfile', 'port', 'identifier', 'interval', 'protocol', 'url_scheme', 'url_host', 'url_port'):
         if args.get(key) is None:
             env_key = f'SECUNITY_{key.upper()}'
             args[key] = os.environ.get(env_key)
             if key in ('verbose', 'to_stdout', 'to_stderr', ) and not isinstance(args[key], bool):
-                args[key] = False
+                value = (args[key] or '').lower()
+                args[key] = True if value == 'true' else \
+                            False if value == 'false' else False
     return args
 
 if __name__ == '__main__':
-    # import argparse
     import time
     import copy
     from conf import get_args_parser
 
     parser = get_args_parser()
-    # argparse.ArgumentParser(description='Secunity Network Device XFlow Filter')
-    #
-    #
-    # parser.add_argument('-c', '--config', type=str, help='Config file (overriding all other options)', default=None)
-    #
-    # parser.add_argument('-l', '--logfile', type=str, help='File to log to', default=None)
-    # parser.add_argument('-v', '--verbose', type=bool, help='Indicates whether to log verbose data', default=False)
-    #
-    # parser.add_argument('--to_stdout', '--stdout', type=str, help='Log messages to stdout', default=False)
-    # parser.add_argument('--to_stderr', '--stderr', type=str, help='Log errors to stderr', default=False)
-    #
-    # parser.add_argument('-p', '--port', type=str, help='Listening port (UDP)', default=None)
-    # parser.add_argument('--identifier', '--id', type=str, help='Agent ID - must be XFlow Agent ID', default=None)
-    # parser.add_argument('-t', '--type', type=str, help='XFlow type (netflow/sflow/ipfix)', default=None)
-
-    # parser.add_argument('--url', type=str, help='The URL to use for remove server', default=None)
-    # parser.add_argument('--url_scheme', type=str, help='Remote server URL scheme', default=None)
-    # parser.add_argument('--url_host', type=str, help='Remote server URL hostname', default=None)
-    # parser.add_argument('--url_port', type=int, help='Remote server URL port', default=None)
-    # parser.add_argument('--url_path', type=str, help='Remote server URL path', default=None)
-    # parser.add_argument('--url_method', type=str, help='Remote server URL method', default=None)
 
     args = parser.parse_args()
     args = _parse_enviroment_vars(vars(args))

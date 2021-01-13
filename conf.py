@@ -30,6 +30,6 @@ def get_args_parser():
 
     parser.add_argument('-p', '--port', type=str, help='Listening port (UDP)', default=None)
     parser.add_argument('--identifier', '--id', type=str, help='Agent ID - must be XFlow Agent ID', default=None)
-    parser.add_argument('-t', '--type', type=str, help='XFlow type (netflow/sflow/ipfix)', default=None)
+    parser.add_argument('-t', '--protocol', type=str, help='XFlow protocol (netflow/sflow/ipfix)', default=None)
 
     return parser
