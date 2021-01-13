@@ -172,6 +172,7 @@ def _write_files(port, networks, forwarders, tag=None, **kwargs):
     def _write_nfacctd():
         nfacctd_file = os.path.join(SECUNITY_FOLDER, _DEFAULTS['nfacctd_config'])
         lines = [
+            # 'daemonize: true',
             f'nfacctd_port: {port}',
 
             'plugins: tee[a]',
@@ -200,11 +201,12 @@ def restart_supervisor_tasks():
     try:
         log.debug(f'restarting {__NFACCTD_SUPERVISOR_TASK_NAME__} service')
         res = subprocess.check_output(shlex.split(command))
-        print(res)
+        log.debug(f'result: {res}')
     except Exception as ex:
         log.exception(f'failed to restart {__NFACCTD_SUPERVISOR_TASK_NAME__} task: "{str(ex)}"')
         return False
 
+    return True
 
 def _work(**kwargs):
     log.debug('starting iteration')
@@ -304,7 +306,7 @@ def _validate_args(args):
 
 
 def _parse_enviroment_vars(args):
-    for key in ('config', 'logfile', 'port', 'identifier', 'type'):
+    for key in ('config', 'logfile', 'port', 'identifier', 'type', 'url_scheme', 'url_host', 'url_port'):
         if args.get(key) is None:
             env_key = f'SECUNITY_{key.upper()}'
             args[key] = os.environ.get(env_key)
