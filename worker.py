@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-'''
+"""
 All rights reserved to Secunity 2021
-'''
+"""
 import collections
 import datetime
 import os
@@ -10,32 +10,25 @@ import re
 import shlex
 import subprocess
 from ipaddress import IPv4Network, IPv4Address
-
+from conf import SECUNITY_FOLDER, __DEFAULT_CONF__, __NFACCTD_SUPERVISOR_TASK_NAME__
 import requests
-from conf import cnf as _cnf
 from logger import log
 
 
 _URL = {
     'url_host': 'api.secunity.io',
     'url_scheme': 'https',
-    'url_path': 'cxflow1/v1.0.0/in/account/{identifier}/{type}/',
+    'url_path': 'cxflow1/v1.0.0/in/account/{identifier}/{protocol}/',
     'url_method': 'GET'
 }
-
-SECUNITY_FOLDER = '/etc/secunity'
-PMCACCTD_FOLDER_ = '/etc/pmacct'
-__NFACCTD_SUPERVISOR_TASK_NAME__ = 'nfacctd'
 
 MAX_PORT = 65535
 
 
 _DEFAULTS = {
-    # 'config': f'{SECUNITY_FOLDER}/secunity.conf',
-
     'tag': 100,
-
-    'xflow_type': 'netflow',
+    'interval': '1h',
+    'protocol': 'netflow',
 
     'nfacctd_config': 'nfacctd.conf',
     'networks_config': 'secunity-networks.map',
@@ -68,17 +61,18 @@ def _make_request(**kwargs):
     if not url:
         url_path = kwargs.get('url_path', con_params.get('url_path'))
         if '{' in url_path:
-            kwargs['url_path'] = url_path.format(identifier=identifier, type=kwargs['type'])
-        url_params = {_: kwargs.get(_, con_params.get(_)) for _ in list(set(list(kwargs.keys()) + list(con_params.keys())))
-                      if _ == 'url' or _.startswith('url_')}
+            kwargs['url_path'] = url_path.format(identifier=identifier, protocol=kwargs['protocol'])
+        url_params = {
+            _: kwargs.get(_, con_params.get(_))
+            for _ in list(set(list(kwargs.keys()) + list(con_params.keys())))
+            if _ == 'url' or _.startswith('url_')
+        }
 
         url_port = url_params.get('url_port')
         if url_port:
             url_params['url_host'] = f"{url_params['url_host']}:{url_port}"
         url = '{url_scheme}://{url_host}/{url_path}'.format(**url_params)
         con_params.update(url_params)
-
-        # url = f"{url.rstrip('/ ')}/{identifier}/"
 
     log.debug(f'making request for identifier {identifier} to {url}')
     try:
@@ -177,6 +171,7 @@ def _write_files(port, networks, forwarders, tag=None, **kwargs):
     def _write_nfacctd():
         nfacctd_file = os.path.join(SECUNITY_FOLDER, _DEFAULTS['nfacctd_config'])
         lines = [
+            # 'daemonize: true',
             f'nfacctd_port: {port}',
 
             'plugins: tee[a]',
@@ -205,10 +200,12 @@ def restart_supervisor_tasks():
     try:
         log.debug(f'restarting {__NFACCTD_SUPERVISOR_TASK_NAME__} service')
         res = subprocess.check_output(shlex.split(command))
-        print(res)
+        log.debug(f'result: {res}')
     except Exception as ex:
         log.exception(f'failed to restart {__NFACCTD_SUPERVISOR_TASK_NAME__} task: "{str(ex)}"')
         return False
+
+    return True
 
 
 def _work(**kwargs):
@@ -227,9 +224,6 @@ def _work(**kwargs):
     tag, cur_networks = _get_current_networks(**kwargs)
 
     networks_diff = _diff_lists(cur_networks, networks)
-
-    # cur_forwarders = _get_current_forwarders(tag=tag)
-    # collector_diff = collector not in cur_forwarders
 
     if not networks_diff: # and not collector_diff:
         log.debug('no networks changes - quiting')
@@ -260,7 +254,7 @@ def _start_scheduler(**kwargs):
                                      timezone=pytz.utc)
 
     _scheduler.add_job(func=_work,
-                       trigger=IntervalTrigger(minutes=1),
+                       trigger=IntervalTrigger(seconds=args['interval'].total_seconds()),
                        kwargs=kwargs,
                        max_instances=1,
                        next_run_time=datetime.datetime.utcnow() + datetime.timedelta(seconds=1))
@@ -282,6 +276,12 @@ def _parse_config(config, **kwargs):
     with open(config, 'r') as f:
         return json.load(f)
 
+
+_re_interval = {
+    'minute': re.compile(r'^\s*([1-9][0-9]*)\s*m\s*$', re.IGNORECASE),
+    'hours': re.compile(r'^\s*([1-9][0-9]*)\s*h\s*$', re.IGNORECASE),
+    'days': re.compile(r'^\s*([1-9][0-9]*)\s*d\s*$', re.IGNORECASE),
+}
 
 def _validate_args(args):
     identifier = args.get('identifier')
@@ -305,43 +305,51 @@ def _validate_args(args):
         log.error(f'invalid listening port: "{port}"')
         return False
 
+    interval = args.get('interval')
+    if not interval:
+        interval = _DEFAULTS['interval']
+    m = _re_interval['minute'].match(interval)
+    if m:
+        interval = datetime.timedelta(minutes=int(m.groups()[0]))
+    else:
+        m = _re_interval['hours'].match(interval)
+        if m:
+            interval = datetime.timedelta(hours=int(m.groups()[0]))
+        elif _re_interval['days'].match(interval):
+            interval = datetime.timedelta(days=int(m.groups()[0]))
+        else:
+            log.error(f'invalid interval: "{interval}"')
+            return False
+    args['interval'] = interval
+
+    protocol = args.get('protocol', '').strip()
+    if protocol:
+        if protocol.lower() not in ('netflow', 'sflow', 'ipfix'):
+            log.error(f'invalid protocol: "{protocol}"')
+    else:
+        protocol = _DEFAULTS['protocol']
+    args['protocol'] = protocol.lower()
+
     return True
 
 
 def _parse_enviroment_vars(args):
-    for key in ('config', 'logfile', 'port', 'identifier', 'type'):
+    for key in ('config', 'logfile', 'port', 'identifier', 'interval', 'protocol', 'url_scheme', 'url_host', 'url_port'):
         if args.get(key) is None:
             env_key = f'SECUNITY_{key.upper()}'
             args[key] = os.environ.get(env_key)
             if key in ('verbose', 'to_stdout', 'to_stderr', ) and not isinstance(args[key], bool):
-                args[key] = False
+                value = (args[key] or '').lower()
+                args[key] = True if value == 'true' else \
+                            False if value == 'false' else False
     return args
 
 if __name__ == '__main__':
-    import argparse
     import time
     import copy
+    from conf import get_args_parser
 
-    parser = argparse.ArgumentParser(description='Secunity Network Device XFlow Filter')
-
-    parser.add_argument('-c', '--config', type=str, help='Config file (overriding all other options)', default=None)
-
-    parser.add_argument('-l', '--logfile', type=str, help='File to log to', default=None)
-    parser.add_argument('-v', '--verbose', type=bool, help='Indicates whether to log verbose data', default=False)
-
-    parser.add_argument('--to_stdout', '--stdout', type=str, help='Log messages to stdout', default=False)
-    parser.add_argument('--to_stderr', '--stderr', type=str, help='Log errors to stderr', default=False)
-
-    parser.add_argument('-p', '--port', type=str, help='Listening port (UDP)', default=None)
-    parser.add_argument('--identifier', '--id', type=str, help='Agent ID - must be XFlow Agent ID', default=None)
-    parser.add_argument('-t', '--type', type=str, help='XFlow type (netflow/sflow/ipfix)', default=None)
-
-    # parser.add_argument('--url', type=str, help='The URL to use for remove server', default=None)
-    # parser.add_argument('--url_scheme', type=str, help='Remote server URL scheme', default=None)
-    # parser.add_argument('--url_host', type=str, help='Remote server URL hostname', default=None)
-    # parser.add_argument('--url_port', type=int, help='Remote server URL port', default=None)
-    # parser.add_argument('--url_path', type=str, help='Remote server URL path', default=None)
-    # parser.add_argument('--url_method', type=str, help='Remote server URL method', default=None)
+    parser = get_args_parser()
 
     args = parser.parse_args()
     args = _parse_enviroment_vars(vars(args))
@@ -350,7 +358,11 @@ if __name__ == '__main__':
     _args.update({k: v for k, v in args.items() if v is not None})
     args = _args
 
-    config = args['config']
+    config = args.get('config')
+    if not config:
+        default_conf = os.path.join(SECUNITY_FOLDER, __DEFAULT_CONF__)
+        if os.path.isfile(default_conf):
+            config = args['config'] = default_conf
     if config:
         config = _parse_config(config)
         args.update(config)
