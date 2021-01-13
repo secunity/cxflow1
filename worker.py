@@ -314,8 +314,8 @@ def _parse_enviroment_vars(args):
 
 if __name__ == '__main__':
     # import argparse
-    # import time
-    # import copy
+    import time
+    import copy
     from conf import get_args_parser
 
     parser = get_args_parser()
@@ -348,7 +348,7 @@ if __name__ == '__main__':
     _args.update({k: v for k, v in args.items() if v is not None})
     args = _args
 
-    config = args['config']
+    config = args.get('config')
     if not config:
         default_conf = os.path.join(SECUNITY_FOLDER, __DEFAULT_CONF__)
         if os.path.isfile(default_conf):
