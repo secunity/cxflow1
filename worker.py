@@ -76,7 +76,11 @@ def _make_request(**kwargs):
 
     log.debug(f'making request for identifier {identifier} to {url}')
     try:
-        res = requests.get(url)
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        }
+        res = requests.get(url, headers=headers)
         result = res.json()
     except Exception as ex:
         log.exception(f'failed to make request for identifier {identifier} to {url}: {str(ex)})')
