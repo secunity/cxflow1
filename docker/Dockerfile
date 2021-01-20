@@ -1,4 +1,4 @@
-FROM        pmacct/nfacctd
+FROM        pmacct/base
 MAINTAINER  Secunity LTD. (support@secunity.io)
 
 ENV         PATH="/opt/secunity-cxflow:${PATH}"

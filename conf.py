@@ -12,7 +12,6 @@ cnf = {
 }
 
 SECUNITY_FOLDER = '/etc/secunity'
-__NFACCTD_SUPERVISOR_TASK_NAME__ = 'nfacctd'
 __DEFAULT_CONF__ = 'secunity-cxflow.conf'
 
 

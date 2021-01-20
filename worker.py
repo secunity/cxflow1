@@ -10,10 +10,17 @@ import re
 import shlex
 import subprocess
 from ipaddress import IPv4Network, IPv4Address
-from conf import SECUNITY_FOLDER, __DEFAULT_CONF__, __NFACCTD_SUPERVISOR_TASK_NAME__
 import requests
+import yaml
+from conf import SECUNITY_FOLDER, __DEFAULT_CONF__
 from logger import log
 
+
+_protocol_to_daemon = {
+    'netflow': 'nfacctd',
+    'sflow': 'sfacctd',
+    'ipfix': 'nfacctd',
+}
 
 _URL = {
     'url_host': 'api.secunity.io',
@@ -31,8 +38,17 @@ _DEFAULTS = {
     'protocol': 'netflow',
 
     'nfacctd_config': 'nfacctd.conf',
+    'sfacctd_config': 'sfacctd.conf',
     'networks_config': 'secunity-networks.map',
-    'forwarders': 'secunity-forwarders.lst'
+    'forwarders': 'secunity-forwarders.lst',
+
+    'supervisord': '/etc/supervisor/supervisord.conf',
+}
+
+_regexes = {
+    'supervisord-program': re.compile(r'\[program\:([^\s]+)\]'),
+    'supervisord-program-autostart': re.compile(r'autostart\=([^\s]+)'),
+    'network_line': re.compile(r'^set_tag=(?P<tag>[0-9]+)\s+dst_net=(?P<network>[^\s]+)$'),
 }
 
 _scheduler = None
@@ -126,7 +142,7 @@ def _get_current_networks(**kwargs):
             content = f.read()
         content = content.split('\n')
         content = [_.strip() for _ in content if _.strip() and not _.strip().startswith(';')]
-        content = [_network_line_regex.match(_).groupdict() for _ in content]
+        content = [_regexes['network_line'].match(_).groupdict() for _ in content]
 
         tag = content[0]['tag'] if content else _DEFAULTS['tag']
         networks = [_['network'] for _ in content]
@@ -153,7 +169,7 @@ def _get_current_forwarders(tag=None, **kwargs):
         return []
 
 
-def _write_files(port, networks, forwarders, tag=None, **kwargs):
+def _write_files(port, networks, forwarders, protocol, tag=None, **kwargs):
     if not tag:
         tag = _DEFAULTS['tag']
 
@@ -172,23 +188,24 @@ def _write_files(port, networks, forwarders, tag=None, **kwargs):
         with open(forwarders_file, 'w') as f:
             f.write(lines)
 
-    def _write_nfacctd():
-        nfacctd_file = os.path.join(SECUNITY_FOLDER, _DEFAULTS['nfacctd_config'])
+    def _write_listener_conf(program):
+        # nfacctd_file = os.path.join(SECUNITY_FOLDER, _DEFAULTS['nfacctd_config'])
+        conf_file = os.path.join(SECUNITY_FOLDER, _DEFAULTS[f'{program}_config'])
         lines = [
             # 'daemonize: true',
-            f'nfacctd_port: {port}',
+            f'{program}_port: {port}',
 
             'plugins: tee[a]',
             f'tee_receivers[a]: {forwarders_file}',
             f'pre_tag_map[a]: {networks_file}'
         ]
         lines = '\n'.join(lines)
-        with open(nfacctd_file, 'w') as f:
+        with open(conf_file, 'w') as f:
             f.write(lines)
 
     _write_networks_file()
     _write_forwarders_file()
-    _write_nfacctd()
+    _write_listener_conf(_protocol_to_daemon[protocol])
 
 
 def _diff_lists(list1, list2):
@@ -199,21 +216,86 @@ def _diff_lists(list1, list2):
     return collections.Counter(list1) != collections.Counter(list2)
 
 
-def restart_supervisor_tasks():
-    command = f'supervisorctl restart {__NFACCTD_SUPERVISOR_TASK_NAME__}'
+def restart_supervisor_tasks(protocol, autostart=True, **kwargs):
+    name = _protocol_to_daemon[protocol]
+
+    command = f'supervisorctl restart {name}'
     try:
-        log.debug(f'restarting {__NFACCTD_SUPERVISOR_TASK_NAME__} service')
+        log.debug(f'restarting {name} service ({protocol})')
+        command = 'echo "AA"'
         res = subprocess.check_output(shlex.split(command))
-        log.debug(f'result: {res}')
+        log.debug(f'restarting {name} service ({protocol}) result: "{res}"')
     except Exception as ex:
-        log.exception(f'failed to restart {__NFACCTD_SUPERVISOR_TASK_NAME__} task: "{str(ex)}"')
+        log.exception(f'failed to restart {name} service ({protocol}): "{str(ex)}"')
         return False
+
+    if autostart:
+        with open(_DEFAULTS['supervisord'], 'r') as f:
+            lines = f.read()
+        lines = [_.strip() for _ in lines.split('\n')]
+        cur_program = None
+        for i, line in enumerate(lines):
+            if not line or line.startswith('#'):
+                continue
+            m = _regexes['supervisord-program'].match(line)
+            if m:
+                cur_program = m.groups()[0]
+            elif cur_program:
+                m = _regexes['supervisord-program-autostart'].match(line)
+                if m:
+                    value = 'true' if cur_program == name else 'false'
+                    lines[i] = f'autostart={value}'
+
+        lines = '\n'.join(lines)
+        with open(_DEFAULTS['supervisord'], 'w') as f:
+            f.write(lines)
 
     return True
 
 
+def _parse_supervisord(**kwargs):
+    with open(_DEFAULTS['supervisord'], 'r') as f:
+        lines = f.read()
+    lines = [_.strip() for _ in lines.split('\n')]
+    programs = {}
+    cur_program = None
+    for i, line in enumerate(lines):
+        m = _regexes['supervisord-program'].match(line)
+        if m:
+            cur_program = m.groups()[0]
+            programs[cur_program] = {
+                'lines': [],
+                'autostart': None,
+            }
+        else:
+            if cur_program:
+                programs[cur_program]['lines'].append(line)
+                if not line.startswith('#'):
+                    m = _regexes['supervisord-program-autostart'].match(line)
+                    if m:
+                        programs[cur_program]['autostart'] = m.groups()[0] == 'true'
+
+    programs['protocol'] = next((k for k, v in programs.items()
+                                 if v['autostart'] and k in _protocol_to_daemon.values()), None)
+
+    return programs
+
+
+def _parse_pmacct_conf(conf, **kwargs):
+    if not os.path.isfile(conf):
+        log.warning(f'conf file does not exist: "{conf}"')
+        return {}
+    with open(conf, 'r') as f:
+        content = yaml.safe_load(f)
+    return content
+
 def _work(**kwargs):
     log.debug('starting iteration')
+
+    supervisord = _parse_supervisord(**kwargs)
+    if not supervisord:
+        log.error('supervisord file does not exist - quiting')
+        return
 
     collector_ip, collector_port, networks = _make_request(**kwargs)
     if not is_ipv4(collector_ip) or not collector_port or collector_port <= 0:
@@ -227,19 +309,27 @@ def _work(**kwargs):
     collector = f'{collector_ip}:{collector_port}'
     tag, cur_networks = _get_current_networks(**kwargs)
 
-    networks_diff = _diff_lists(cur_networks, networks)
+    forwarders = _get_current_forwarders(tag=tag, **kwargs)
 
-    if not networks_diff: # and not collector_diff:
-        log.debug('no networks changes - quiting')
+    diff = _diff_lists(cur_networks, networks)
+    if not diff:
+        diff = _diff_lists(forwarders, [collector])
+        if not diff:
+            diff = supervisord.get('protocol') != _protocol_to_daemon[kwargs['protocol']]
+
+    if not diff:
+        log.debug('no protocol, collector or networks changes - quiting')
         return
 
     # full_forwarders = list(set(kwargs.get('forwarders', []) + [collector]))
     log.debug('rewriting filter config files')
-    _write_files(port=kwargs['port'], networks=networks, forwarders=[collector])
+
+    _write_files(port=kwargs['port'], networks=networks, protocol=kwargs['protocol'], forwarders=[collector])
+
     log.debug('filter config files has been rewritten')
 
     log.debug('restarting supervisord tasks')
-    restart_supervisor_tasks()
+    restart_supervisor_tasks(protocol=kwargs['protocol'])
     log.debug('supervisord tasks restarted')
 
     log.debug(f'finished iteration')
@@ -330,6 +420,8 @@ def _validate_args(args):
     if protocol:
         if protocol.lower() not in ('netflow', 'sflow', 'ipfix'):
             log.error(f'invalid protocol: "{protocol}"')
+        if protocol == 'ipfix':
+            protocol = 'netflow'
     else:
         protocol = _DEFAULTS['protocol']
     args['protocol'] = protocol.lower()
