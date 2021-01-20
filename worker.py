@@ -222,7 +222,7 @@ def restart_supervisor_tasks(protocol, autostart=True, **kwargs):
     command = f'supervisorctl restart {name}'
     try:
         log.debug(f'restarting {name} service ({protocol})')
-        command = 'echo "AA"'
+        # command = 'echo "AA"'
         res = subprocess.check_output(shlex.split(command))
         log.debug(f'restarting {name} service ({protocol}) result: "{res}"')
     except Exception as ex:
