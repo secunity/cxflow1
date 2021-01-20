@@ -463,6 +463,8 @@ if __name__ == '__main__':
         config = _parse_config(config)
         args.update(config)
 
+    log.init(**args)
+
     if _validate_args(args):
         _start_scheduler(**args)
 
