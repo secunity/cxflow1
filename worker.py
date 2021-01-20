@@ -222,7 +222,7 @@ def restart_supervisor_tasks(protocol, autostart=True, **kwargs):
     command = f'supervisorctl restart {name}'
     try:
         log.debug(f'restarting {name} service ({protocol})')
-        command = 'echo "AA"'
+        # command = 'echo "AA"'
         res = subprocess.check_output(shlex.split(command))
         log.debug(f'restarting {name} service ({protocol}) result: "{res}"')
     except Exception as ex:
@@ -462,6 +462,8 @@ if __name__ == '__main__':
     if config:
         config = _parse_config(config)
         args.update(config)
+
+    log.init(**args)
 
     if _validate_args(args):
         _start_scheduler(**args)

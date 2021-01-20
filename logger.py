@@ -9,7 +9,7 @@ def _init_logger(logfile=None, verbose=False, to_stdout=False, to_stderr=False, 
     if _cnf[LOG_INIT]:
         return logger
 
-    log_level = logging.DEBUG if verbose else logging.ERROR
+    log_level = logging.DEBUG if verbose else logging.WARNING
     logger.setLevel(log_level)
 
     handlers = []
@@ -47,3 +47,9 @@ class log(metaclass=logMeta):
         if not cls._logger:
             cls._logger = _init_logger(**_cnf)
         return cls._logger
+
+    @classmethod
+    def init(cls, **kwargs):
+        cls._logger = _init_logger(**kwargs)
+
+
