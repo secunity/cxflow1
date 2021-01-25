@@ -430,14 +430,21 @@ def _validate_args(args):
 
 
 def _parse_enviroment_vars(args):
-    for key in ('config', 'logfile', 'port', 'identifier', 'interval', 'protocol', 'url_scheme', 'url_host', 'url_port'):
+    for key in ('config', 'logfile', 'verbose', 'to_stderr', 'to_stdout', 'stderr', 'stdout',
+                'port', 'identifier',
+                'type', 'protocol',
+                'interval',
+                'url_scheme', 'url_host', 'url_port'):
         if args.get(key) is None:
             env_key = f'SECUNITY_{key.upper()}'
             args[key] = os.environ.get(env_key)
-            if key in ('verbose', 'to_stdout', 'to_stderr', ) and not isinstance(args[key], bool):
-                value = (args[key] or '').lower()
-                args[key] = True if value == 'true' else \
-                            False if value == 'false' else False
+
+    for key in ('verbose', 'to_stdout', 'to_stderr', ):
+        if not isinstance(args.get(key), bool):
+            value = (args[key] or '').lower()
+            args[key] = True if value == 'true' else \
+                False if value == 'false' else False
+
     return args
 
 if __name__ == '__main__':
