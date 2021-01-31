@@ -296,7 +296,7 @@ def _work(**kwargs):
     if not supervisord:
         log.error('supervisord file does not exist - quiting')
         return
-
+    # collector_ip, collector_port, networks = '11.22.33.44', 3456, ['1.2.3.0/24', '1.2.5.0/24']
     collector_ip, collector_port, networks = _make_request(**kwargs)
     if not is_ipv4(collector_ip) or not collector_port or collector_port <= 0:
         log.error('invalid or no collector was specified - quiting')
@@ -416,7 +416,7 @@ def _validate_args(args):
             return False
     args['interval'] = interval
 
-    protocol = args.get('protocol', '').strip()
+    protocol = (args.get('protocol') or args.get('type', '')).strip()
     if protocol:
         if protocol.lower() not in ('netflow', 'sflow', 'ipfix'):
             log.error(f'invalid protocol: "{protocol}"')
