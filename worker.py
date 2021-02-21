@@ -43,6 +43,7 @@ _DEFAULTS = {
     'forwarders': 'secunity-forwarders.lst',
 
     'supervisord': '/etc/supervisor/supervisord.conf',
+    'worker_supervisord_task': 'secunity-cxflow',
 }
 
 _regexes = {
@@ -243,7 +244,7 @@ def restart_supervisor_tasks(protocol, autostart=True, **kwargs):
             elif cur_program:
                 m = _regexes['supervisord-program-autostart'].match(line)
                 if m:
-                    value = 'true' if cur_program == name else 'false'
+                    value = 'true' if cur_program in (_DEFAULTS['worker_supervisord_task'], name) else 'false'
                     lines[i] = f'autostart={value}'
 
         lines = '\n'.join(lines)
