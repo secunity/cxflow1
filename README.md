@@ -17,7 +17,7 @@ $ docker run -dit \
   -p $LISTENING_PORT:$LISTENING_PORT/udp \
   -e "SECUNITY_IDENTIFIER=$IDENTIFIER" \
   -e "SECUNITY_PORT=$LISTENING_PORT" \
-  -e "SECUNITY_TYPE=$PROTOCOL_TYPE" \ 
+  -e "SECUNITY_PROTOCOL=$PROTOCOL" \ 
   secunity/cxflow
 ```
 
@@ -29,7 +29,7 @@ $ docker run -dit \
   -p 1234:1234/udp \
   -e "SECUNITY_IDENTIFIER=xxxxxxxxxxxx" \
   -e "SECUNITY_PORT=1234" \
-  -e "SECUNITY_TYPE=netflow" \
+  -e "SECUNITY_PROTOCOL=netflow" \
   secunity/cxflow
 ``` 
 

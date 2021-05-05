@@ -11,7 +11,6 @@ import shlex
 import subprocess
 from ipaddress import IPv4Network, IPv4Address
 import requests
-import yaml
 from conf import SECUNITY_FOLDER, __DEFAULT_CONF__
 from logger import log
 
@@ -282,14 +281,6 @@ def _parse_supervisord(**kwargs):
     return programs
 
 
-def _parse_pmacct_conf(conf, **kwargs):
-    if not os.path.isfile(conf):
-        log.warning(f'conf file does not exist: "{conf}"')
-        return {}
-    with open(conf, 'r') as f:
-        content = yaml.safe_load(f)
-    return content
-
 def _work(**kwargs):
     log.debug('starting iteration')
 
@@ -481,7 +472,8 @@ if __name__ == '__main__':
             time.sleep(1)
     except Exception as ex:
         log.warning(f'Stop signal recieved, shutting down scheduler: {str(ex)}')
-        _scheduler.shutdown()
+        if _scheduler:
+            _scheduler.shutdown()
         log.warning('scheduler stopped')
         log.warning('quiting')
 

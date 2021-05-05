@@ -2,4 +2,3 @@ requests==2.23.0
 APScheduler==3.6.3
 bson==0.5.10
 jstyleson==0.0.2
-PyYAML==5.3.1

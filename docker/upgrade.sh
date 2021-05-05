@@ -1,7 +1,12 @@
 #!/bin/bash
 
-supervisorctl stop secunity-cxflow
+supervisorctl stop $SECUNITYAPP
 
-cd /opt/secunity-cxflow && git fetch && git pull && find . -name '*.pyc' -delete
+cd /opt/$SECUNITYAPP &&\
+git fetch &&\
+git pull &&\
+git checkout $SECUNITYBRANCH &&\
+git pull &&\
+find /opt/$SECUNITYAPP -name '*.pyc' -delete
 
-supervisorctl start secunity-cxflow
+supervisorctl start $SECUNITYAPP
