@@ -1,6 +1,5 @@
-# cxflow - Secunity's xFlow Handler 
-Secunity's xFlow (Netflow/sFlow/Ipfix) handler for xFlow on the customer's network.
-The handler filters only networks associated with the account or its customers and forwards the xFlow to Secunity fr further processing.
+# cxflow - Secunity's XFlow Filter 
+Secunity's XFlow (Netflow/sFlow/Ipfix) filter by account networks
 
 Built on top of [pmacct/pmacct](https://github.com/pmacct/pmacct) - see [/docker](https://github.com/secunity/cxflow1/docker) folder 
 
@@ -21,7 +20,7 @@ $ docker run -dit \
   secunity/cxflow
 ```
 
-For instance, using Netflow protocol, listening port 1234 and identifier "xxxxxxxxxxxx":
+For instance, using listening port 1234 and identifier "xxxxxxxxxxxx the command should look
 ```shell script
 $ docker run -dit \
   --name secunity-cxflow \
@@ -72,14 +71,14 @@ If your local network is using this range please take make the following additio
     $ docker run -dit \
       --name secunity-cxflow \
       --restart unless-stopped \
-      --network $NETWORK_NAME \
+      --network secunity-cxflow-net \
       -p $LISTENING_PORT:$LISTENING_PORT/udp \
       -e "SECUNITY_IDENTIFIER=$IDENTIFIER" \
       -e "SECUNITY_PORT=$LISTENING_PORT" \
       -e "SECUNITY_PROTOCOL=$PROTOCOL" \ 
       secunity/cxflow
     ```
-    For instance, using Netflow protocol, listening port 1234 and identifier "xxxxxxxxxxxx":
+    For instance, using listening port 1234 and identifier "xxxxxxxxxxxx the command should look
     ```shell script
     $ docker run -dit \
       --name secunity-cxflow \
@@ -91,4 +90,3 @@ If your local network is using this range please take make the following additio
       -e "SECUNITY_PROTOCOL=netflow" \
       secunity/cxflow
     ``` 
-   
